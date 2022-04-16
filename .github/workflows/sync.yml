@@ -2,7 +2,8 @@ name: autosync
 on:
   schedule:
     - cron: 0 8 * * fri
-
+  workflow_dispatch:
+  
 jobs:
   date:
     runs-on: ubuntu-latest
