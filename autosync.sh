@@ -1,5 +1,5 @@
 ## 清理文件
-rm -rf $(ls | grep -v autosync.sh |grep -v adguardhome |grep -v README.md | xargs)
+rm -rf $(ls |grep -v autosync.sh |grep -v ^adguardhome$ |grep -v README.md | xargs)
 
 # luci-theme-argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git
@@ -13,14 +13,14 @@ git clone https://github.com/pymumu/openwrt-smartdns.git
 
 # adguardhome
 git clone https://github.com/rufengsuixing/luci-app-adguardhome.git
-
+grep -v adguardhome
 
 # 出国留学
 git clone https://github.com/jerrykuku/luci-app-vssr.git
 ## pass openwrt-passwall 插件库
 git clone --depth 1 -b packages https://github.com/xiaorouji/openwrt-passwall.git
 mv -n openwrt-passwall/chinadns-ng \
-        openwrt-passwall/dns2socks \
+        openwrt-passwall/dns2socks \grep -w "adguardhome"
         openwrt-passwall/hysteria \
         openwrt-passwall/ipt2socks \
         openwrt-passwall/pdnsd-alt \
@@ -46,3 +46,5 @@ mv -n helloworld/luci-app-ssr-plus \
 rm -rf helloworld & rm -rf openwrt-passwall
 rm -rf ./*/.git & rm -rf ./*/.gitattributes
 rm -rf ./*/.svn & rm -rf ./*/.github & rm -rf ./*/.gitignore
+
+
