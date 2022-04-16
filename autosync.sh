@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ## 清理文件
 rm -rf $(ls |grep -v autosync.sh |grep -v dguardhome |grep -v README.md | xargs)
 rm -rf luci-app-adguardhome
