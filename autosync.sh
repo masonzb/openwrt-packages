@@ -21,7 +21,7 @@ git clone https://github.com/jerrykuku/luci-app-vssr.git
 ## pass openwrt-passwall 插件库
 git clone --depth 1 -b packages https://github.com/xiaorouji/openwrt-passwall.git
 mv -n openwrt-passwall/chinadns-ng \
-        openwrt-passwall/dns2socks \grep -w "adguardhome"
+        openwrt-passwall/dns2socks \
         openwrt-passwall/hysteria \
         openwrt-passwall/ipt2socks \
         openwrt-passwall/pdnsd-alt \
@@ -47,5 +47,3 @@ mv -n helloworld/luci-app-ssr-plus \
 rm -rf helloworld & rm -rf openwrt-passwall
 rm -rf ./*/.git & rm -rf ./*/.gitattributes
 rm -rf ./*/.svn & rm -rf ./*/.github & rm -rf ./*/.gitignore
-
-
