@@ -3,6 +3,12 @@
 ## 清理文件
 rm -rf $(ls |grep -v autosync.sh |grep -v README.md | xargs)
 
+# luci-theme-argon 主题
+git clone https://github.com/jerrykuku/luci-theme-argon.git
+git clone https://github.com/jerrykuku/luci-app-argon-config.git
+git clone https://github.com/sirpdboy/luci-app-advanced.git
+git clone https://github.com/thinktip/luci-theme-neobird.git
+
 # 出国留学
 git clone https://github.com/jerrykuku/luci-app-vssr.git
 ## pass openwrt-passwall 插件库
