@@ -1,3 +1,5 @@
+[![Sync](https://github.com/zbb1906/openwrt-packages/actions/workflows/autosync.yml/badge.svg)](https://github.com/zbb1906/openwrt-packages/actions/workflows/autosync.yml)
+
 ## 个人使用
 
 ```shell
