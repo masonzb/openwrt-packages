@@ -19,9 +19,15 @@ jobs:
         run: |
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git add .
-          git commit -m "update $(date +%Y-%m-%d" "%H:%M:%S)"
-
+          
+          status_log=$(git status -sb)
+          if [ "$status_log" == "## master...origin/master" ];then
+            echo "nothing to commit, working tree clean"
+          else
+            git add .
+            git commit -m "update $(date +%Y-%m-%d" "%H:%M:%S)"
+          endif
+          
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
