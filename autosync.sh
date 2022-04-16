@@ -20,8 +20,9 @@ git clone https://github.com/rufengsuixing/luci-app-adguardhome.git
 # immortalwrt
 git clone https://github.com/immortalwrt/packages.git
 mv -n packages/net/adguardhome \
-        packages/net/redsocks2 \
+        packages/net/redsocks2 ./
 
+rm -rf packages
 
 
 # 出国留学
@@ -51,7 +52,7 @@ mv -n helloworld/luci-app-ssr-plus \
         helloworld/v2raya \
         helloworld/xray-core \
         helloworld/xray-plugin ./
-        
+
 git clone https://github.com/jerrykuku/lua-maxminddb.git
 
 # 清理无用文件
