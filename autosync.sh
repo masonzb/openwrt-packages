@@ -10,13 +10,6 @@ git clone https://github.com/jerrykuku/luci-app-argon-config.git
 git clone https://github.com/sirpdboy/luci-app-advanced.git
 git clone https://github.com/thinktip/luci-theme-neobird.git
 
-# smart dns
-git clone https://github.com/pymumu/luci-app-smartdns.git
-git clone https://github.com/pymumu/openwrt-smartdns.git
-
-# adguardhome
-git clone https://github.com/rufengsuixing/luci-app-adguardhome.git
-
 # immortalwrt
 git clone https://github.com/immortalwrt/packages.git
 mv -n packages/net/redsocks2 \
