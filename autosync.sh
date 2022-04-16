@@ -1,5 +1,6 @@
 ## 清理文件
-rm -rf $(ls |grep -v autosync.sh |grep -v ^adguardhome$ |grep -v README.md | xargs)
+rm -rf $(ls |grep -v autosync.sh |grep -v dguardhome |grep -v README.md | xargs)
+rm -rf luci-app-adguardhome
 
 # luci-theme-argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git
