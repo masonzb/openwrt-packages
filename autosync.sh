@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## 清理文件
-rm -rf $(ls |grep -v autosync.sh |grep -v dguardhome |grep -v README.md | xargs)
+rm -rf $(ls |grep -v autosync.sh |grep -v README.md | xargs)
 rm -rf luci-app-adguardhome
 
 # luci-theme-argon 主题
@@ -16,7 +16,13 @@ git clone https://github.com/pymumu/openwrt-smartdns.git
 
 # adguardhome
 git clone https://github.com/rufengsuixing/luci-app-adguardhome.git
-grep -v adguardhome
+
+# immortalwrt
+git clone https://github.com/immortalwrt/packages.git
+mv -n packages/net/adguardhome \
+        packages/net/redsocks2 \
+
+
 
 # 出国留学
 git clone https://github.com/jerrykuku/luci-app-vssr.git
@@ -33,6 +39,7 @@ mv -n openwrt-passwall/chinadns-ng \
 # hello world
 git clone https://github.com/fw876/helloworld.git
 mv -n helloworld/luci-app-ssr-plus \
+        helloworld/trojan \
         helloworld/naiveproxy \
         helloworld/shadowsocks-rust \
         helloworld/shadowsocksr-libev \
@@ -44,6 +51,8 @@ mv -n helloworld/luci-app-ssr-plus \
         helloworld/v2raya \
         helloworld/xray-core \
         helloworld/xray-plugin ./
+        
+git clone https://github.com/jerrykuku/lua-maxminddb.git
 
 # 清理无用文件
 rm -rf helloworld & rm -rf openwrt-passwall
