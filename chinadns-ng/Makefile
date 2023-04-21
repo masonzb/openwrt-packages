@@ -5,12 +5,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=chinadns-ng
-PKG_VERSION:=2023.04.11-2
+PKG_VERSION:=2023.04.20
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/zfl9/chinadns-ng/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=a0dfba8bb57dbde1d789662a28add675b483f3dd5d75c736a132500f4d628d60
+PKG_HASH:=e1f5197ecd96ebab4440fe069e0a06935df7ea07ac1ad0bab3f88bffe0055294
 
 PKG_LICENSE:=AGPL-3.0-only
 PKG_LICENSE_FILES:=LICENSE
