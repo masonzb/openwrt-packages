@@ -31,7 +31,7 @@ function vmess_vless()
 						id = server.vmess_id,
 						alterId = (server.v2ray_protocol == "vmess" or not server.v2ray_protocol) and tonumber(server.alter_id) or nil,
 						security = (server.v2ray_protocol == "vmess" or not server.v2ray_protocol) and server.security or nil,
-						encryption = (server.v2ray_protocol == "vless") and server.vless_encryption or nil,
+						encryption = (server.v2ray_protocol == "vless") and server.vless_encryption or "none",
 						flow = (((server.xtls == '1') or (server.tls == '1') or (server.reality == '1')) and (((server.tls_flow ~= "none") and server.tls_flow) or ((server.xhttp_tls_flow ~= "none") and server.xhttp_tls_flow))) or nil
 					}
 				}
@@ -242,7 +242,6 @@ end
 					minVersion = "1.3"
 				} or nil,
 				realitySettings = (server.reality == '1') and {
-					alpn =  (server.transport == "xhttp" and server.xhttp_alpn ~= "") and server.xhttp_alpn or nil,
 					publicKey = server.reality_publickey,
 					shortId = server.reality_shortid,
 					spiderX = server.reality_spiderx,
@@ -285,12 +284,7 @@ end
 					host = (server.httpupgrade_host or server.tls_host) or nil,
 					path = server.httpupgrade_path or ""
 				} or nil,
-				splithttpSettings = (server.transport == "splithttp") and {
-					-- splithttp
-					host = (server.splithttp_host or server.tls_host) or nil,
-					path = server.splithttp_path or "/"
-				} or nil,
-				xhttpSettings = (server.transport == "xhttp") and {
+				xhttpSettings = (server.transport == "xhttp" or server.transport == "splithttp") and {
 					-- xhttp
 					mode = server.xhttp_mode or "auto",
 					host = (server.xhttp_host or server.tls_host) or nil,
@@ -400,7 +394,7 @@ local trojan = {
 		cipher = cipher,
 		cipher_tls13 = cipher13,
 		sni = server.tls_host,
-		alpn = server.tls_alpn or {"h2", "http/1.1"},
+		alpn = {"h2", "http/1.1"},
 		curve = "",
 		reuse_session = true,
 		session_ticket = (server.tls_sessionTicket == "1") and true or false
