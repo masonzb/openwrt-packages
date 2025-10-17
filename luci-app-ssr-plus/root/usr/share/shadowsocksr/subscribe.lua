@@ -42,6 +42,7 @@ local v2_ss = luci.sys.exec('type -t -p ' .. ss_program .. ' 2>/dev/null') ~= ""
 local has_ss_type = luci.sys.exec('type -t -p ' .. ss_program .. ' 2>/dev/null') ~= "" and ss_type
 local v2_tj = luci.sys.exec('type -t -p trojan') ~= "" and "trojan" or "v2ray"
 local hy2_type = luci.sys.exec('type -t -p hysteria') ~= "" and "hysteria2"
+local tuic_type = luci.sys.exec('type -t -p tuic-client') ~= "" and "tuic"
 local log = function(...)
 	print(os.date("%Y-%m-%d %H:%M:%S ") .. table.concat({...}, " "))
 end
@@ -317,8 +318,10 @@ local function processData(szType, content)
 			result.xhttp_host = info.host
 			result.xhttp_path = info.path
 			-- 检查 extra 参数是否存在且非空
-			result.enable_xhttp_extra = (info.extra and info.extra ~= "") and "1" or nil
-			result.xhttp_extra = (info.extra and info.extra ~= "") and info.extra or nil
+			if params.extra and params.extra ~= "" then
+				result.enable_xhttp_extra = "1"
+				result.xhttp_extra = params.extra
+			end
 			-- 尝试解析 JSON 数据
 			local success, Data = pcall(jsonParse, info.extra or "")
 			if success and type(Data) == "table" then
@@ -402,16 +405,18 @@ local function processData(szType, content)
 		local idx_sp = content:find("#") or 0
 		local alias = ""
 		if idx_sp > 0 then
-			alias = UrlDecode(content:sub(idx_sp + 1))
+			alias = content:sub(idx_sp + 1, -1)
+			content = content:sub(0, idx_sp - 1):gsub("/%?", "?")
 		end
-		local info = content:sub(1, idx_sp > 0 and idx_sp - 1 or #content):gsub("/%?", "?")
+		result.alias = UrlDecode(alias)
 
 		-- 拆 base64 主体和 ? 参数部分
-		local uri_main, query_str = info:match("^([^?]+)%??(.*)$")
-		--log("SS 节点格式:", uri_main)
+		local info = content
+		local find_index, query = info:match("^([^?]+)%??(.*)$")
+		--log("SS 节点格式:", find_index)
 		local params = {}
-		if query_str and query_str ~= "" then
-			for _, v in ipairs(split(query_str, '&')) do
+		if query and query ~= "" then
+			for _, v in ipairs(split(query, '&')) do
 				local t = split(v, '=')
 				if #t >= 2 then
 					params[t[1]] = UrlDecode(t[2])
@@ -420,28 +425,28 @@ local function processData(szType, content)
 		end
 
 		if not params.type or params.type == "" then
-			local is_old_format = uri_main:find("@") and not uri_main:find("://.*@")
-			local base64_str, host_port, userinfo, server, port, method, password
+			local is_old_format = find_index:find("@") and not find_index:find("://.*@")
+			local old_base64, host_port, userinfo, server, port, method, password
 
 			if is_old_format then
 				-- 旧格式：base64(method:pass)@host:port
-				base64_str, host_port = uri_main:match("^([^@]+)@(.-)$")
-				log("SS 节点旧格式解析:", base64_str)
-				if not base64_str or not host_port then
-					log("SS 节点旧格式解析失败:", uri_main)
+				old_base64, host_port = find_index:match("^([^@]+)@(.-)$")
+				log("SS 节点旧格式解析:", old_base64)
+				if not old_base64 or not host_port then
+					log("SS 节点旧格式解析失败:", find_index)
 					return nil
 				end
-				local decoded = base64Decode(UrlDecode(base64_str))
+				local decoded = base64Decode(UrlDecode(old_base64))
 				if not decoded then
-					log("SS base64 解码失败（旧格式）:", base64_str)
+					log("SS base64 解码失败（旧格式）:", old_base64)
 					return nil
 				end
 				userinfo = decoded
 			else
 				-- 新格式：base64(method:pass@host:port)
-				local decoded = base64Decode(UrlDecode(uri_main))
+				local decoded = base64Decode(UrlDecode(find_index))
 				if not decoded then
-					log("SS base64 解码失败（新格式）:", uri_main)
+					log("SS base64 解码失败（新格式）:", find_index)
 					return nil
 				end
 				userinfo, host_port = decoded:match("^(.-)@(.-)$")
@@ -452,13 +457,13 @@ local function processData(szType, content)
 			end
 
 			-- 解析加密方式和密码（允许密码包含冒号）
-			local split_pos = userinfo:find(":")
-			if not split_pos then
+			local meth_pass = userinfo:find(":")
+			if not meth_pass then
 				log("SS 用户信息格式错误:", userinfo)
 				return nil
 			end
-			method = userinfo:sub(1, split_pos - 1)
-			password = userinfo:sub(split_pos + 1)
+			method = userinfo:sub(1, meth_pass - 1)
+			password = userinfo:sub(meth_pass + 1)
 
 			-- 判断密码是否经过url编码
 			local function isURLEncodedPassword(pwd)
@@ -491,22 +496,12 @@ local function processData(szType, content)
 			end
 
 			-- 填充 result
-			result.alias = alias
 			result.type = v2_ss
-			result.v2ray_protocol = (v2_ss == "v2ray") and "shadowsocks" or nil
 			result.has_ss_type = has_ss_type
 			result.encrypt_method_ss = method
 			result.password = password
 			result.server = server
 			result.server_port = port
-
-			-- 仅在 v2ray + shadowsocks 协议时处理 ECH
-			if v2_ss == "v2ray" and result.v2ray_protocol == "shadowsocks" then
-				if params.ech and params.ech ~= "" then
-					result.enable_ech = "1"
-					result.ech_config = ech
-				end
-			end
 
 			-- 插件处理
 			if params.plugin then
@@ -572,17 +567,17 @@ local function processData(szType, content)
 			local url = URL.parse("http://" .. info)
 			local params = url.query
 
-			result.alias = alias
-			result.type = "v2ray"
+			v2_ss = "v2ray"
+			result.type = v2_ss
 			result.v2ray_protocol = "shadowsocks"
 			result.server = url.host
 			result.server_port = url.port
 
 			-- 判断 @ 前部分是否为 Base64
-			local is_base64_decoded = base64Decode(UrlDecode(url.user))
-			if is_base64_decoded:find(":") then
+			local is_base64 = base64Decode(UrlDecode(url.user))
+			if is_base64:find(":") then
         		-- 新格式：method:password
-        		result.encrypt_method_ss, result.password = is_base64_decoded:match("^(.-):(.*)$")
+        		result.encrypt_method_ss, result.password = is_base64:match("^(.-):(.*)$")
 			else
         		-- 旧格式：UUID 直接作为密码
         		result.password = url.user
@@ -612,11 +607,15 @@ local function processData(szType, content)
 			result.reality_shortid = params.sid
 			result.reality_spiderx = params.spx and UrlDecode(params.spx) or nil
 			-- 检查 ech 参数是否存在且非空
-			result.enable_ech = (params.ech and params.ech ~= "") and "1" or nil
-			result.ech_config = (params.ech and params.ech ~= "") and params.ech or nil
+			if params.ech and params.ech ~= "" then
+				result.enable_ech = "1"
+				result.ech_config = params.ech
+			end
 			-- 检查 pqv 参数是否存在且非空
-			result.enable_mldsa65verify = (params.pqv and params.pqv ~= "") and "1" or nil
-			result.reality_mldsa65verify = (params.pqv and params.pqv ~= "") and params.pqv or nil
+			if params.pqv and params.pqv ~= "" then
+				result.enable_mldsa65verify = "1"
+				result.reality_mldsa65verify = params.pqv
+			end
 			if result.transport == "ws" then
 				result.ws_host = (result.tls ~= "1") and (params.host and UrlDecode(params.host)) or nil
 				result.ws_path = params.path and UrlDecode(params.path) or "/"
@@ -628,8 +627,10 @@ local function processData(szType, content)
 				result.xhttp_mode = params.mode or "auto"
 				result.xhttp_path = params.path and UrlDecode(params.path) or "/"
 				-- 检查 extra 参数是否存在且非空
-				result.enable_xhttp_extra = (params.extra and params.extra ~= "") and "1" or nil
-				result.xhttp_extra = (params.extra and params.extra ~= "") and params.extra or nil
+				if params.extra and params.extra ~= "" then
+					result.enable_xhttp_extra = "1"
+					result.xhttp_extra = params.extra
+				end
 				-- 尝试解析 JSON 数据
 				local success, Data = pcall(jsonParse, params.extra or "")
 				if success and type(Data) == "table" then
@@ -702,78 +703,67 @@ local function processData(szType, content)
 			result.server = nil
 		end
 	elseif szType == "trojan" then
-		local params = {}
-		local idx_sp = 0
-		local alias = ""
-
 		-- 提取别名（如果存在）
+		local alias = ""
 		if content:find("#") then
-			idx_sp = content:find("#")
+			local idx_sp = content:find("#")
 			alias = content:sub(idx_sp + 1, -1)
+			content = content:sub(0, idx_sp - 1)
 		end
-		local info = content:sub(1, idx_sp > 0 and idx_sp - 1 or #content)
-		local hostInfo = split(info, "@")
-
-		-- 基础验证
-		if #hostInfo < 2 then
-			--log("Trojan节点格式错误: 缺少@符号")
-			return nil
-		end
-
-		local userinfo = hostInfo[1]
-		local hostPort = hostInfo[2]
-		
-		-- 分离服务器地址和端口
-		local hostParts = split(hostPort, ":")
-
-		-- 验证服务器地址和端口
-		if #hostParts < 2 then
-			--log("Trojan节点格式错误: 缺少端口号")
-			return nil
-		end
-
-		local server = hostParts[1]
-		local port = hostParts[2]
-
 		result.alias = UrlDecode(alias)
-		result.server = server
-		result.password = userinfo
 
-		-- 默认设置
-		-- 按照官方的建议 默认验证ssl证书
-		result.insecure = "0"
-		result.tls = "1"
+		-- 分离和提取 password		
+		local Info = content
+		local params = {} 
+		if Info:find("@") then
+			local contents = split(Info, "@")
+			result.password = UrlDecode(contents[1])
+			local port = "443"
+			Info = (contents[2] or ""):gsub("/%?", "?")
 
-		-- 解析查询参数（如果存在）
-		if port:find("?") then
-			local queryParts = split(port, "?")
-			result.server_port = queryParts[1]
-
-			-- 解析查询参数
-			for _, v in pairs(split(queryParts[2], "&")) do
-				local t = split(v, "=")
-				if #t >= 2 then
-					params[t[1]] = t[2]
+			-- 分离主机和 query 参数（key=value&key2=value2）
+			local query = split(Info, "%?")
+			local host_port = query[1]
+			for _, v in pairs(split(query[2], '&')) do
+				local t = split(v, '=')
+				if #t > 1 then
+					params[string.lower(t[1])] = UrlDecode(t[2])
 				end
 			end
+
+			-- 提取服务器地址和端口
+			if host_port:find(":") then
+				local sp = split(host_port, ":")
+				result.server_port = sp[#sp]
+				result.server = sp[1]
+			else
+				result.server = host_port
+			end
+
+			-- 默认设置
+			-- 按照官方的建议 默认验证ssl证书
+			result.insecure = "0"
+			result.tls = "1"
 
 			-- 处理参数
 			if params.alpn then
 				-- 处理 alpn 参数
 				result.tls_alpn = params.alpn
 			end
-
-			if params.sni then
+			if params.peer or params.sni then
 				-- 未指定peer（sni）默认使用remote addr
-				result.tls_host = params.sni
+				result.tls_host = params.peer or params.sni
 			end
-
 			if params.allowInsecure then
 				-- 处理 insecure 参数
-				result.insecure = params.allowInsecure
+				if params.allowinsecure == "1" or params.allowinsecure == "0" then
+					result.insecure = params.allowInsecure
+				else
+					result.insecure = string.lower(params.allowinsecure) == "true" and "1" or "0"
+				end
 			end
 			if params.tfo then
-				-- 处理 insecure 参数
+				-- 处理 fast open 参数
 				result.fast_open = params.tfo
 			end
 		else
@@ -818,8 +808,10 @@ local function processData(szType, content)
 					result.xhttp_mode = params.mode or "auto"
 					result.xhttp_path = params.path and UrlDecode(params.path) or "/"
 					-- 检查 extra 参数是否存在且非空
-					result.enable_xhttp_extra = (params.extra and params.extra ~= "") and "1" or nil
-					result.xhttp_extra = (params.extra and params.extra ~= "") and params.extra or nil
+					if params.extra and params.extra ~= "" then
+						result.enable_xhttp_extra = "1"
+						result.xhttp_extra = params.extra
+					end
 					-- 尝试解析 JSON 数据
 					local success, Data = pcall(jsonParse, params.extra or "")
 					if success and type(Data) == "table" then
@@ -895,11 +887,15 @@ local function processData(szType, content)
 		result.reality_shortid = params.sid
 		result.reality_spiderx = params.spx and UrlDecode(params.spx) or nil
 		-- 检查 ech 参数是否存在且非空
-		result.enable_ech = (params.ech and params.ech ~= "") and "1" or nil
-		result.ech_config = (params.ech and params.ech ~= "") and params.ech or nil
+		if params.ech and params.ech ~= "" then
+			result.enable_ech = "1"
+			result.ech_config = params.ech
+		end
 		-- 检查 pqv 参数是否存在且非空
-		result.enable_mldsa65verify = (params.pqv and params.pqv ~= "") and "1" or nil
-		result.reality_mldsa65verify = (params.pqv and params.pqv ~= "") and params.pqv or nil
+		if params.pqv and params.pqv ~= "" then
+			result.enable_mldsa65verify = "1"
+			result.reality_mldsa65verify = params.pqv
+		end
 		if result.transport == "ws" then
 			result.ws_host = (result.tls ~= "1") and (params.host and UrlDecode(params.host)) or nil
 			result.ws_path = params.path and UrlDecode(params.path) or "/"
@@ -911,8 +907,10 @@ local function processData(szType, content)
 			result.xhttp_mode = params.mode or "auto"
 			result.xhttp_path = params.path and UrlDecode(params.path) or "/"
 			-- 检查 extra 参数是否存在且非空
-			result.enable_xhttp_extra = (params.extra and params.extra ~= "") and "1" or nil
-			result.xhttp_extra = (params.extra and params.extra ~= "") and params.extra or nil
+			if params.extra and params.extra ~= "" then
+				result.enable_xhttp_extra = "1"
+				result.xhttp_extra = params.extra
+			end
 			-- 尝试解析 JSON 数据
 			local success, Data = pcall(jsonParse, params.extra or "")
 			if success and type(Data) == "table" then
@@ -951,6 +949,61 @@ local function processData(szType, content)
 				result.tcp_path = params.path and UrlDecode(params.path) or nil
 			end
 		end
+	elseif szType == "tuic" then
+		-- 提取别名（如果存在）
+		local alias = ""
+		if content:find("#") then
+			local idx_sp = content:find("#")
+			alias = content:sub(idx_sp + 1, -1)
+			content = content:sub(0, idx_sp - 1)
+		end
+		result.alias = UrlDecode(alias)
+
+		-- 分离和提取 uuid 和 password
+		local Info = content
+		if Info:find("@") then
+			local contents = split(Info, "@")
+			if contents[1]:find(":") then
+				local userinfo = split(contents[1], ":")
+				result.tuic_uuid = UrlDecode(userinfo[1])
+				result.tuic_passwd = UrlDecode(userinfo[2])
+			end
+			Info = (contents[2] or ""):gsub("/%?", "?")
+		end
+
+		-- 分离主机和 query 参数（key=value&key2=value2）
+		local query = split(Info, "%?")
+		local host_port = query[1]
+		local params = {}
+		for _, v in pairs(split(query[2], '&')) do
+			local t = split(v, '=')
+			if #t > 1 then
+				params[string.lower(t[1])] = UrlDecode(t[2])
+			end
+		end
+
+		-- 提取服务器地址和端口
+		if host_port:find(":") then
+			local sp = split(host_port, ":")
+			result.server_port = sp[#sp]
+			result.server = sp[1]
+		else
+			result.server = host_port
+		end
+
+		result.type = tuic_type
+		result.tuic_ip = params.sni or ""
+		result.udp_relay_mode = params.udp_relay_mode or "native"
+		result.congestion_control = params.congestion_control or "cubic"
+
+		-- alpn 支持逗号或分号分隔
+		if params.alpn and params.alpn ~= "" then
+			local alpn = {}
+			for v in params.alpn:gmatch("[^,;|%s]+") do
+				table.insert(alpn, v)
+			end
+			result.tuic_alpn = alpn
+		end
 	end
 	if not result.alias then
 		if result.server and result.server_port then
@@ -964,7 +1017,7 @@ local function processData(szType, content)
 	result.alias = nil
 	local switch_enable = result.switch_enable
 	result.switch_enable = nil
-	result.hashkey = md5(jsonStringify(result))
+	result.hashkey = md5(jsonStringify(result) .. "_" .. (alias or ""))
 	result.alias = alias
 	result.switch_enable = switch_enable
 	return result
@@ -1166,7 +1219,7 @@ local execute = function()
 										if dat[3] then
 											dat3 = "://" .. dat[3]
 										end
-										if dat[1] == 'ss' or dat[1] == 'trojan' then
+										if dat[1] == 'ss' or dat[1] == 'trojan' or dat[1] == 'tuic' then
 											result = processData(dat[1], dat[2] .. dat3)
 										else
 											result = processData(dat[1], base64Decode(dat[2]))
@@ -1179,6 +1232,7 @@ local execute = function()
 								if result then
 									-- 中文做地址的 也没有人拿中文域名搞，就算中文域也有Puny Code SB 机场
 									if not result.server or not result.server_port
+										or result.server == "127.0.0.1"
 										or result.alias == "NULL"
 										or check_filer(result)
 										or result.server:match("[^0-9a-zA-Z%-_%.%s]")
