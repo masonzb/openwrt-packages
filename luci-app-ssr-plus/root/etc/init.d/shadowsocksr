@@ -587,7 +587,7 @@ start_udp() {
 		gen_config_file $UDP_RELAY_SERVER $type 2 $tmp_udp_local_port
 		ln_start_bin $(first_type tuic-client) tuic-client --config $udp_config_file
 		ln_start_bin $(first_type ipt2socks) ipt2socks -U -b 0.0.0.0 -4 -s 127.0.0.1 -p $tmp_udp_local_port -l $tmp_udp_port
-		echolog "UDP TPROXY Relay:tuic-client $($(first_type tuic-client) --version) Started!"
+		echolog "UDP TPROXY Relay:$($(first_type tuic-client) --version) Started!"
 		echolog "TUIC UDP TPROXY Relay not supported!"
 		#redir_udp=0
 		#ARG_UDP=""
@@ -879,7 +879,7 @@ start_shunt() {
 		gen_config_file $SHUNT_SERVER $type 3 $tmp_port		# make a tuic socks :304
 		ln_start_bin $(first_type tuic-client) tuic-client --config $shunt_dns_config_file
 		shunt_dns_command $tmp_port
-		echolog "Netflix Separated Shunt Server:tuic-client $($(first_type tuic-client) --version) Started!"
+		echolog "Netflix Separated Shunt Server:$($(first_type tuic-client) --version) Started!"
 		# FIXME: ipt2socks cannot handle udp reply from tuic
 		#redir_udp=0
 		;;
@@ -985,7 +985,7 @@ start_local() {
 		if [ "$_local" == "2" ]; then
 			gen_config_file $LOCAL_SERVER $type 4 $local_port
 			ln_start_bin $(first_type tuic-client) tuic-client --config $local_config_file
-			echolog "Global Socks5:tuic-client $($(first_type tuic-client) --version) Started!"
+			echolog "Global Socks5:$($(first_type tuic-client) --version) Started!"
 		fi
 		;;
 	shadowtls)
@@ -1104,9 +1104,9 @@ Start_Run() {
 		if [ -n $socks_port ] && [ $GLOBAL_SERVER == $LOCAL_SERVER ]; then #start a new tuic instance
 			gen_config_file $GLOBAL_SERVER $type 4 $socks_port
 			ln_start_bin $(first_type tuic-client) tuic-client --config $local_config_file
-			echolog "Global Socks5:tuic-client $($(first_type tuic-client) --version) Started!"
+			echolog "Global Socks5:$($(first_type tuic-client) --version) Started!"
 		fi
-		echolog "Main node:tuic-client $($(first_type tuic-client) --version) Started!"
+		echolog "Main node:$($(first_type tuic-client) --version) Started!"
 		;;
 	shadowtls)
 		if [ -z "$socks_port" ]; then
@@ -1405,6 +1405,45 @@ start_monitor() {
 	fi
 }
 
+start_xhttp_addr() {
+	local xhttp_addr_file="/etc/ssrplus/xhttp_address.txt"
+	local tmp_file="/tmp/.xhttp_addr.tmp"
+
+	# 收集所有 xhttp_extra 地址，去掉空行并去重排序
+	{
+		for sec in "$GLOBAL_SERVER" "$SHUNT_SERVER" "$UDP_RELAY_SERVER"; do
+			local extra
+			extra=$(uci_get_by_name "$sec" xhttp_extra)
+			[ -n "$extra" ] && \
+				echo "$extra" | sed -n 's/.*"address":[[:space:]]*"\([^"]*\)".*/\1/p'
+		done
+	} | grep -v '^$' | sort -u > "$tmp_file"
+
+	# 如果没有 xhttp_extra 地址，删除旧文件并退出
+	if [ ! -s "$tmp_file" ]; then
+		[ -f "$xhttp_addr_file" ] && rm -f "$xhttp_addr_file"
+		rm -f "$tmp_file"
+		return 0
+	fi
+
+	# 比较 MD5 判断 xhttp_extra 地址是否有变化
+	local md5_new md5_old
+	md5_new=$(md5sum "$tmp_file" | awk '{print $1}')
+	if [ -f "$xhttp_addr_file" ]; then
+		md5_old=$(md5sum "$xhttp_addr_file" | awk '{print $1}')
+	else
+		md5_old=""
+	fi
+
+	# MD5 不同更新 xhttp_extra 地址文件
+	if [ "$md5_new" != "$md5_old" ]; then
+		mv -f "$tmp_file" "$xhttp_addr_file"
+		logger -t ssrplus-xhttp "xhttp_address.txt updated"
+	else
+		rm -f "$tmp_file"
+	fi
+}
+
 start_rules() {
 	local server=$(get_host_ip $GLOBAL_SERVER)
 	local local_port=$(uci_get_by_name $GLOBAL_SERVER local_port)
@@ -1483,6 +1522,7 @@ start() {
 	echo "conf-dir=${TMP_DNSMASQ_PATH}" >"$DNSMASQ_CONF_DIR/dnsmasq-ssrplus.conf"
 	if load_config; then
 		Start_Run
+		start_xhttp_addr
 		start_rules
 		start_dns
 		add_cron
@@ -1604,6 +1644,7 @@ reset() {
 	stop
 	set_lock
 	rm -rf /etc/config/shadowsocksr $LOG_FILE
+	[ -f "/etc/ssrplus/xhttp_address.txt" ] && rm -f /etc/ssrplus/xhttp_address.txt
 	touch /etc/config/shadowsocksr $LOG_FILE
 	cp /usr/share/shadowsocksr/shadowsocksr.config /etc/config/shadowsocksr
 	unset_lock
